@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 
-import ResumeDetails from "./compenents/resumeDetails";
+import ResumeDetails from "./components/resumeDetails";
 
 import PageHeader from "../../components/pageHeader/Header.jsx";
 import { useParams } from "react-router-dom";

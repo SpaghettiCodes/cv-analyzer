@@ -122,7 +122,6 @@ const GithubHighlights = ({ gitusername, disabled }) => {
     const request = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/github?username=${gitusername}`)
     const response = await request.json()
 
-    console.log(response)
     setData(response)
   }
 
@@ -171,22 +170,6 @@ const ResumeHighlights = ({highlights}) => {
   )
 }
 
-const DownloadPDF = () => {
-  return (
-    <button
-    className='flex-1 bg-[#57116F] text-white px-5 py-2 whitespace-nowrap rounded-2xl'
-  >Download PDF</button>
-  )
-}
-
-const DownloadAnalysis = () => {
-  return (
-    <button
-    className='flex-1 bg-[#57116F] text-white px-5 py-2 whitespace-nowrap rounded-2xl'
-  >Download Analysis</button>
-  )
-}
-
 const ResumeDetails = ({viewing}) => {
 
   return (
@@ -199,10 +182,6 @@ const ResumeDetails = ({viewing}) => {
           className="flex justify-between"
           >
             <h1 className="font-light text-6xl place-content-center">{viewing.name}</h1>
-            {/* <div className="flex gap-2 items-center">
-              <DownloadPDF />
-              <DownloadAnalysis />
-            </div> */}
           </div>
           <div className="flex flex-col overflow-auto gap-5">
             <ResumeSummary summary={viewing.summary}/>
