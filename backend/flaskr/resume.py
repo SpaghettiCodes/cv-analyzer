@@ -440,19 +440,39 @@ def job_analysis():
     resumes = list(pdf_collection.find(query))
     if not resumes:
         return jsonify([]), 200
-
-    analysis_all = []
-    workers = min(len(resumes), 8) 
     
-    with ThreadPoolExecutor(max_workers=workers) as executor:
-        futures = [executor.submit(_analyse_single_resume, resume, jd_string) for resume in resumes]
+    for r in resumes:
+        r["_id"] = str(r["_id"])
+        
+    return jsonify(resumes), 200
 
-        for future in futures:
-            res = future.result()
-            if res is not None:
-                analysis_all.append(res)
+@api_bp.route("/job/analyze_single", methods=["GET"])
+def job_analyze_single():
+    job_id = request.args.get("jobId")
+    resume_id = request.args.get("resumeId")
 
-    return jsonify(analysis_all), 200
+    if not job_id or not resume_id:
+        return jsonify({"error": "jobId and resumeId are required"}), 400
+
+    if not ObjectId.is_valid(job_id) or not ObjectId.is_valid(resume_id):
+        return jsonify({"error": "Invalid IDs"}), 400
+
+    jd = jd_collection.find_one({"_id": ObjectId(job_id)})
+    if not jd:
+        return jsonify({"error": "Job description not found"}), 404
+    jd.pop("_id", None)
+    jd_string = json.dumps(jd)
+
+    resume = pdf_collection.find_one({"_id": ObjectId(resume_id)})
+    if not resume:
+        return jsonify({"error": "Resume not found"}), 404
+        
+    analysis_result = _analyse_single_resume(resume, jd_string)
+    
+    if analysis_result is None:
+        return jsonify({"error": "Failed to analyze resume"}), 500
+
+    return jsonify(analysis_result), 200
 
 @api_bp.route("/github", methods=["GET"])
 def github():
@@ -578,3 +598,65 @@ def deleteResume():
         os.remove(file_path)
 
     return jsonify({"msg": "Resume deleted successfully"}), 200
+
+@api_bp.route("/resume/compare_ai", methods=["GET"])
+def compare_resumes_ai():
+    id_a = request.args.get("idA")
+    id_b = request.args.get("idB")
+    job_id = request.args.get("jobId")
+
+    if not id_a or not id_b or not job_id:
+        return jsonify({"error": "idA, idB, and jobId are required"}), 400
+
+    if not ObjectId.is_valid(id_a) or not ObjectId.is_valid(id_b) or not ObjectId.is_valid(job_id):
+        return jsonify({"error": "Invalid IDs provided"}), 400
+
+    # Extract text from both candidate PDFs using existing helper functions
+    text_a = _extract_text_from_stored_pdf(id_a)
+    text_b = _extract_text_from_stored_pdf(id_b)
+    jd_doc = jd_collection.find_one({"_id": ObjectId(job_id)})
+
+    if not text_a or not text_b or not jd_doc:
+        return jsonify({"error": "Data not found"}), 404
+
+    jd_info = f"Title: {jd_doc.get('title')}\nDescription: {jd_doc.get('description')}"
+
+    try:
+        chat_completion = client.chat.completions.create(
+            messages=[
+                {
+                    "role": "system",
+                    "content": (
+                        "You are an expert technical recruiter. Compare Candidate A and Candidate B "
+                        "against the provided job description. Evaluate their alignment, professional history, "
+                        "strengths (pros), and missing skills or structural gaps (cons).\n"
+                        "Return your response in strict JSON format matching this exact schema:\n"
+                        "{\n"
+                        "  \"candidateA\": {\n"
+                        "    \"pros\": [\"bullet point\", \"bullet point\"],\n"
+                        "    \"cons\": [\"bullet point\", \"bullet point\"]\n"
+                        "  },\n"
+                        "  \"candidateB\": {\n"
+                        "    \"pros\": [\"bullet point\", \"bullet point\"],\n"
+                        "    \"cons\": [\"bullet point\", \"bullet point\"]\n"
+                        "  },\n"
+                        "  \"comparative_summary\": \"A short 3-4 sentence evaluation summary contrasting the two candidates.\"\n"
+                        "}"
+                    ),
+                },
+                {
+                    "role": "user",
+                    "content": (
+                        f"Job Description:\n{jd_info}\n\n"
+                        f"Candidate A Resume Text:\n{text_a}\n\n"
+                        f"Candidate B Resume Text:\n{text_b}\n"
+                    ),
+                },
+            ],
+            model=MODEL_NAME,
+            response_format={"type": "json_object"},
+        )
+        result = json.loads(chat_completion.choices[0].message.content)
+        return jsonify(result), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500

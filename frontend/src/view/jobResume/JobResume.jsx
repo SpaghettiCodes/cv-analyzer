@@ -43,7 +43,7 @@ const CandidateList = ({ tableData, maxValue, viewing, compareMode, compareIds, 
             >
               {isCompareSelected ? (
                 <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
-                  <path d="M20 6L9 17l-5-5"/>
+                  <path d="M20 6L9 17l-5-5" />
                 </svg>
               ) : (
                 <span className="w-3 h-3 rounded border border-current" />
@@ -66,7 +66,14 @@ const CandidateList = ({ tableData, maxValue, viewing, compareMode, compareIds, 
                 {row.name}
               </span>
             </div>
-            <ScoreBar matched={row.matched} max={maxValue} />
+
+            {row.isAnalyzing ? (
+              <span className="text-xs text-violet-500 animate-pulse font-medium">AI is analyzing...</span>
+            ) : row.error ? (
+              <span className="text-xs text-red-400">Analysis failed</span>
+            ) : (
+              <ScoreBar matched={row.matched} max={maxValue} />
+            )}
           </button>
         </div>
       );
@@ -89,6 +96,7 @@ export default function JobResume() {
   const [compareIds, setCompareIds] = useState([]);
 
   useEffect(() => {
+    let isMounted = true;
     const fetchData = async () => {
       setLoading(true);
       setTitleLoading(true);
@@ -96,47 +104,79 @@ export default function JobResume() {
         const jdRes = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/getJobDescription?id=${id}`);
         if (jdRes.ok) {
           const jdData = await jdRes.json();
-          setTitle(jdData.title);
-
-          const expCount = jdData.qualifications?.pastExperience?.length || 0;
-          const techCount = jdData.qualifications?.technical?.length || 0;
-          const softCount = jdData.qualifications?.soft?.length || 0;
-          setMaxQua(expCount + techCount + softCount);
+          if (isMounted) {
+            setTitle(jdData.title);
+            const expCount = jdData.qualifications?.pastExperience?.length || 0;
+            const techCount = jdData.qualifications?.technical?.length || 0;
+            const softCount = jdData.qualifications?.soft?.length || 0;
+            setMaxQua(expCount + techCount + softCount);
+          }
         }
-      } catch (err) {
-        console.error(err);
-      } finally {
-        setTitleLoading(false);
-      }
+      } catch (err) { console.error(err); } 
+      finally { if (isMounted) setTitleLoading(false); }
 
       try {
         const analysisRes = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/job/analysis?id=${id}`);
         if (analysisRes.ok) {
           const data = await analysisRes.json();
-          setResults(data);
+          if (!isMounted) return;
 
-          const formatted = data.map((item, i) => {
-            const expMatch = item.qualifications?.pastExperience?.filter(q => q.qualified).length || 0;
-            const techMatch = item.qualifications?.technical?.filter(q => q.qualified).length || 0;
-            const softMatch = item.qualifications?.soft?.filter(q => q.qualified).length || 0;
+          // set resume placeholders
+          const initialData = data.map((item) => ({
+            id: item._id  || item.id,
+            name: item.name,
+            isAnalyzing: true,
+            matched: 0,
+            error: false
+          }));
 
-            return {
-              id: item.id || `candidate-${i}`,
-              name: item.name,
-              matched: expMatch + techMatch + softMatch
-            };
+          setResults(initialData);
+          setTableData(initialData);
+          if (initialData.length > 0) setViewing(initialData[0]);
+          setLoading(false);
+
+          // for each candidate user, call api to get details
+          data.forEach(async (candidate) => {
+            try {
+              const aiRes = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/job/analyze_single?jobId=${id}&resumeId=${candidate.id}`);
+              if (aiRes.ok) {
+                const aiData = await aiRes.json();
+                if (isMounted) {
+                  setResults(prev => prev.map(p => p.id === candidate.id ? { ...p, ...aiData, isAnalyzing: false } : p));
+                  
+                  setTableData(prev => prev.map(p => {
+                    if (p.id === candidate.id) {
+                      const expMatch = aiData.qualifications?.pastExperience?.filter(q => q.qualified).length || 0;
+                      const techMatch = aiData.qualifications?.technical?.filter(q => q.qualified).length || 0;
+                      const softMatch = aiData.qualifications?.soft?.filter(q => q.qualified).length || 0;
+                      return { ...p, matched: expMatch + techMatch + softMatch, isAnalyzing: false };
+                    }
+                    return p;
+                  }));
+                  setViewing(prev => (prev && prev.id === candidate.id) ? { ...prev, ...aiData, isAnalyzing: false } : prev);
+                }
+              } else {
+                if (isMounted) {
+                  setResults(prev => prev.map(p => p.id === candidate.id ? { ...p, isAnalyzing: false, error: true } : p));
+                  setTableData(prev => prev.map(p => p.id === candidate.id ? { ...p, isAnalyzing: false, error: true } : p));
+                  setViewing(prev => (prev && prev.id === candidate.id) ? { ...prev, isAnalyzing: false, error: true } : prev);
+                  
+                }
+              }
+            } catch (err) {
+              if (isMounted) {
+                setResults(prev => prev.map(p => p.id === candidate.id ? { ...p, isAnalyzing: false, error: true } : p));
+                setTableData(prev => prev.map(p => p.id === candidate.id ? { ...p, isAnalyzing: false, error: true } : p));
+                setViewing(prev => (prev && prev.id === candidate.id) ? { ...prev, isAnalyzing: false, error: true } : prev);
+              }
+            }
           });
-
-          setTableData(formatted);
-          if (data.length > 0) setViewing(data[0]);
         }
-      } catch (err) {
-        console.error(err);
-      } finally {
-        setLoading(false);
-      }
+      } catch (err) { console.error(err); if (isMounted) setLoading(false); }
     };
+    
     fetchData();
+    return () => { isMounted = false; };
   }, [id]);
 
   const toggleCompare = (candidateId) => {
@@ -166,7 +206,7 @@ export default function JobResume() {
             <button onClick={() => nav('/job')}
               className="p-1.5 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition">
               <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                <path d="M19 12H5M12 5l-7 7 7 7"/>
+                <path d="M19 12H5M12 5l-7 7 7 7" />
               </svg>
             </button>
             <div>
@@ -189,7 +229,7 @@ export default function JobResume() {
                 }`}
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                <rect x="3" y="3" width="7" height="18" rx="1"/><rect x="14" y="3" width="7" height="18" rx="1"/>
+                <rect x="3" y="3" width="7" height="18" rx="1" /><rect x="14" y="3" width="7" height="18" rx="1" />
               </svg>
               {compareMode ? 'Exit compare' : 'Compare resumes'}
             </button>
@@ -241,10 +281,19 @@ export default function JobResume() {
 
             <div className="flex-1 bg-white border border-gray-100 rounded-2xl shadow-sm overflow-y-auto p-7 min-w-0">
               {compareMode && compareCandidates.length === 2 ? (
-                <ResumeCompare candidateA={compareCandidates[0]} candidateB={compareCandidates[1]} maxQua={maxQua} />
+                <ResumeCompare candidateA={compareCandidates[0]} candidateB={compareCandidates[1]} maxQua={maxQua} jobId={id} />
               ) : compareMode ? (
                 <div className="h-full flex items-center justify-center text-gray-400 italic text-sm text-center px-8">
                   Select two candidates from the list to compare side by side
+                </div>
+              ) : viewing?.isAnalyzing ? (
+                <div className="h-full flex flex-col items-center justify-center text-gray-400 text-sm gap-4">
+                   <div className="w-8 h-8 border-4 border-violet-500 border-t-transparent rounded-full animate-spin"></div>
+                   <p>Extracting insights...</p>
+                </div>
+              ) : viewing?.error ? (
+                <div className="h-full flex items-center justify-center text-red-400 italic text-sm">
+                  Failed to generate AI insights for this candidate.
                 </div>
               ) : viewing ? (
                 <ResumeDetails viewing={viewing} />

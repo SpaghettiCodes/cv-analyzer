@@ -48,6 +48,7 @@ const Section = ({ title, children }) => (
 const GithubHighlights = ({ username }) => {
   const [data, setData] = useState(null);
   const [error, setError] = useState(false);
+  const [ratelimited, setRateLimited] = useState(false);
 
   useEffect(() => {
     if (!username) { setError(true); return; }
