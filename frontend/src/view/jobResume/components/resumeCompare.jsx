@@ -201,13 +201,13 @@ const ResumeCompare = ({ candidateA, candidateB, maxQua, jobId }) => {
               <div className="bg-violet-50/10 border border-violet-100/60 rounded-xl p-4 flex flex-col gap-3">
                 <h4 className="text-sm font-bold text-violet-900">{candidateA.name}</h4>
                 <div>
-                  <p className="text-xs font-semibold text-emerald-700 mb-1">🟢 Advantages</p>
+                  <p className="text-xs font-semibold text-emerald-700 mb-1">Advantages</p>
                   <ul className="list-disc pl-4 text-xs text-gray-600 space-y-1">
                     {aiData.candidateA?.pros?.map((pro, i) => <li key={i}>{pro}</li>)}
                   </ul>
                 </div>
                 <div>
-                  <p className="text-xs font-semibold text-red-700 mb-1">🔴 Vulnerabilities / Gaps</p>
+                  <p className="text-xs font-semibold text-red-700 mb-1">Vulnerabilities / Gaps</p>
                   <ul className="list-disc pl-4 text-xs text-gray-600 space-y-1">
                     {aiData.candidateA?.cons?.map((con, i) => <li key={i}>{con}</li>)}
                   </ul>

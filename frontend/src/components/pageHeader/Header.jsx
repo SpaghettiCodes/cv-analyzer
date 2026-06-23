@@ -20,7 +20,6 @@ const PageHeader = () => {
 
   return (
     <header className="bg-gray-900 border-b border-white/10 px-6 h-14 flex items-center gap-6 shrink-0">
-      <img src="/Experian-Logo.png" className="h-7 w-auto" alt="Experian" />
       <div className="w-px h-5 bg-white/20" />
       <nav className="flex gap-1">
         {navLink('/', 'Resumes')}
