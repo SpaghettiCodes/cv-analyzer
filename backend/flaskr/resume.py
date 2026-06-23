@@ -147,7 +147,9 @@ def openAI():
                         "You are a HR that takes in a resume as text, your job is to match "
                         "which tags best suits the resume. The tags will be passed to you in json form\n"
                         f"The JSON object you return will be in this format:\n{TAGS_JSON}\n"
-                        "the return JSON object must have between 1 to 3 _id in an array form "
+                        "the return JSON object must have between 1 to 3 _id in an array form ("
+                        "you may go over this limit if you feel its suitable, "
+                        "do not force assign tags just to have some) "
                         "and only the id, and also the candidate name from the resume\n"
                         f"Here are the tag name, _id and description:\n{list_all_tags()}\n"
                         'if "github" / "name" cant be found remove the field'
@@ -254,7 +256,6 @@ def _apply_new_tags_to_resumes(new_tag_ids):
         for tid in matched:
             if tid not in merged:
                 merged.append(tid)
-        merged = merged[:3]
 
         pdf_collection.update_one({"_id": resume["_id"]}, {"$set": {"tag_ids": merged}})
 
@@ -637,7 +638,7 @@ def compare_resumes_ai():
                         "    \"pros\": [\"bullet point\", \"bullet point\"],\n"
                         "    \"cons\": [\"bullet point\", \"bullet point\"]\n"
                         "  },\n"
-                        "  \"comparative_summary\": \"A short 3-4 sentence evaluation summary contrasting the two candidates.\"\n"
+                        "  \"comparative_summary\": \"A short 5-6 sentence evaluation summary contrasting the two candidates.\"\n"
                         "}"
                     ),
                 },
