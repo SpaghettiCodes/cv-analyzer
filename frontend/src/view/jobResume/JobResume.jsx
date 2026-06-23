@@ -136,7 +136,7 @@ export default function JobResume() {
           setLoading(false);
 
           // for each candidate user, call api to get details
-          data.forEach(async (candidate) => {
+          initialData.forEach(async (candidate) => {
             try {
               const aiRes = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/job/analyze_single?jobId=${id}&resumeId=${candidate.id}`);
               if (aiRes.ok) {
