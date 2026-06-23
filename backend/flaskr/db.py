@@ -23,6 +23,4 @@ tags_collection = db["tags"]
 pdf_collection = db["pdf"]
 jd_collection = db["jobDescription"]
 
-UPLOAD_DIR = os.path.abspath(
-    os.path.join(os.path.dirname(__file__), "..", "pdfUploads")
-)
+UPLOAD_DIR = os.environ.get("UPLOAD_DIR")

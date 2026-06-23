@@ -21,11 +21,11 @@ services:
       - "5000:5000"
     env_file:
       - ./backend/.env
-    environment:
-      MONGODB_URI: mongodb://admin:password@mongo:27017/experian?authSource=admin
     depends_on:
       mongo:
         condition: service_healthy
+    volumes:
+      - backend_data:/data
 
   frontend:
     build: ./frontend
@@ -40,3 +40,4 @@ services:
 
 volumes:
   mongo_data:
+  backend_data:

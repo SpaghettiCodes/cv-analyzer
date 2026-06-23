@@ -1,112 +1,167 @@
 import { useEffect, useRef, useState } from "react";
 import PDFUploader from "../pdfUpload/uploadPdf";
 import Modal from "../Modal";
-import TagDivs from "./TagDivs";
-
 
 const JDUploader = ({ open, onClose }) => {
-	const modalRef = useRef(null);
-  const [procesState, setProcessing] = useState(false)
-	const [allTags, setAllTags] = useState([])
-	const [tagArray, setTag] = useState([])
+  const modalRef = useRef(null);
+  const [processing, setProcessing] = useState(false);
+  const [saving, setSaving] = useState(false);
+  
+  const [extractedData, setExtractedData] = useState(null);
+  const [tagsList, setTagsList] = useState([]);
+  const [customTag, setCustomTag] = useState("");
 
-	const getAllTags = async () => {
-		const request = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/getAllTags`)
-		const response = await request.json()
-		if (!request.ok) {
-			console.error("Shit, panic")
-			return 
-		}
-		setAllTags(response)
-	}
+  useEffect(() => {
+    if (!open) {
+      setExtractedData(null);
+      setTagsList([]);
+      setCustomTag("");
+      return;
+    }
+    const handler = (e) => {
+      if (modalRef.current && !modalRef.current.contains(e.target)) onClose();
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [open]);
 
-	useEffect(() => {
-		getAllTags()
-	}, [])
-
-  const handleClickOutside = (event) => {
-    if (modalRef.current && !modalRef.current.contains(event.target)) {
-      onClose();
+  const uploadPDF = async (files) => {
+    try {
+      const formData = new FormData();
+      formData.append('File', files[0]);
+      
+      const res = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/parseJD/analyze`, {
+        method: 'POST',
+        body: formData,
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || 'Upload failed');
+      
+      setExtractedData(json.extracted_data);
+      setTagsList(json.suggested_tags || []);
+    } catch (err) {
+      alert(err.message);
     }
   };
 
-	const modifyTagArray = (tagData) => {
-		console.log(tagArray)
-		console.log(tagData)
-		const newTagArray = tagArray.slice()
-		const index = newTagArray.indexOf(tagData)
-		console.log(index)
-		if (index < 0)
-			newTagArray.push(tagData)
-		else
-			newTagArray.splice(index, 1);
-		setTag(newTagArray)
-	}
+  const handleRemoveTag = (indexToRemove) => {
+    setTagsList(tagsList.filter((_, index) => index !== indexToRemove));
+  };
 
-	const uploadPDF = async (files) => {
-		console.log(tagArray)
-		const file = files[0]
+  const handleAddCustomTag = (e) => {
+    if (e.key === 'Enter' || e.type === 'click') {
+      const cleanTag = customTag.trim();
+      if (cleanTag && !tagsList.includes(cleanTag)) {
+        setTagsList([...tagsList, cleanTag]);
+        setCustomTag("");
+      }
+    }
+  };
 
-		console.log(file)
+  const handleSaveJob = async () => {
+    setSaving(true);
+    try {
+      const res = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/parseJD/confirm`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          extracted_data: extractedData,
+          final_tags: tagsList
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || 'Saving failed');
+      onClose();
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      setSaving(false);
+    }
+  };
 
-		const url = `${process.env.REACT_APP_BACKEND_URL}/api/parseJD`
-		const formData = new FormData()
-		formData.append('File', file)
-		formData.append('tags', tagArray.map(val => val._id))
+  return (
+    <Modal open={open}>
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+        <div ref={modalRef} className="bg-white rounded-2xl shadow-2xl w-[32rem] p-7 flex flex-col gap-5 relative z-10">
+          <div>
+            <h2 className="text-xl font-bold text-gray-900">Upload Job Description</h2>
+            <p className="text-sm text-gray-400 mt-1">
+              {!extractedData ? "Upload a file to automatically structure requirements." : "Review and configure job matching criteria tags."}
+            </p>
+          </div>
 
-		try {
-			setProcessing(true)
-			const response = await fetch(url, {
-				method: 'POST',
-				body: formData
-			})
-			const json = await response.json()
-			// uhh heres the message, idk what u wanna do w/ this
-			console.log(json.msg)
-		} catch {
-			alert("Well that failed")
-		}
+          {!processing && !extractedData && (
+            <PDFUploader onClose={onClose} setProcessing={setProcessing} onUpload={uploadPDF} />
+          )}
 
-		setTag([])
-	}
+          {processing && (
+            <div className="flex flex-col items-center justify-center py-14 gap-3 text-center">
+              <div className="w-10 h-10 border-[3px] border-gray-100 border-t-violet-600 rounded-full animate-spin" />
+              <span className="text-sm font-medium">Analysing job description...</span>
+              <span className="text-xs text-gray-400">This may take a moment</span>
+            </div>
+          )}
 
-	useEffect(() => {
-		open ? document.addEventListener('mousedown', handleClickOutside) 
-			: document.removeEventListener('mousedown', handleClickOutside)
+          {!processing && extractedData && (
+            <div className="flex flex-col gap-4 relative">
+              {saving && (
+                <div className="absolute inset-0 z-20 bg-white/80 backdrop-blur-sm rounded-xl flex flex-col items-center justify-center gap-2">
+                  <div className="w-10 h-10 border-[3px] border-gray-100 border-t-violet-600 rounded-full animate-spin" />
+                  <span className="text-sm font-medium text-gray-700">Creating job & syncing resume tags...</span>
+                </div>
+              )}
+              <div>
+                <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider block mb-2">
+                  Job Matching Tags
+                </label>
+                
+                <div className="flex flex-wrap gap-2 max-h-32 overflow-y-auto border border-gray-100 p-3 bg-gray-50 rounded-xl mb-3">
+                  {tagsList.map((tag, idx) => (
+                    <span key={idx} className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-violet-100 text-violet-700 border border-violet-200">
+                      {tag}
+                      <button onClick={() => handleRemoveTag(idx)} className="hover:text-violet-900 text-violet-400 font-bold transition text-xs">
+                        ×
+                      </button>
+                    </span>
+                  ))}
+                  {tagsList.length === 0 && (
+                    <p className="text-xs text-gray-400 italic">No tags assigned. Add some below.</p>
+                  )}
+                </div>
 
-		return () => {
-			document.removeEventListener('mousedown', handleClickOutside)
-		}
-	}, [open])
+                <div className="flex gap-2">
+                  <input 
+                    type="text" 
+                    value={customTag}
+                    onChange={(e) => setCustomTag(e.target.value)}
+                    onKeyDown={handleAddCustomTag}
+                    placeholder="Type custom tag and press Enter" 
+                    className="flex-1 px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:border-violet-400"
+                  />
+                  <button onClick={handleAddCustomTag} className="px-4 py-2 text-sm font-medium bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition">
+                    Add
+                  </button>
+                </div>
+              </div>
 
-	return (
-		<Modal open={open}>
-			<div ref={modalRef}
-      className='bg-white rounded-lg h-[35rem] w-[30rem] md:h-[50rem] md:w-[50rem] 
-      flex flex-col justify-center items-center overflow-auto px-48'>
-        { procesState ? <span>Uploading ...</span> : 
-				<PDFUploader 
-					onClose={onClose}
-					setProcessing={setProcessing}
-					onUpload={uploadPDF}
-				>
-					<div className="flex flex-col gap-2">
-						<div>Select Tags: </div>
-						<div className="flex flex-wrap gap-2">
-							{ allTags.map( (val, index) =>
-								<TagDivs 
-								key={index}
-								tagData={val}
-								clicked={tagArray.indexOf(val) >= 0}
-								onClick={() => modifyTagArray(val)}
-							/>) }
-						</div> 
-					</div>
-				</PDFUploader>
-				}
-			</div>
-		</Modal>
-	)
-}
+              <div className="flex justify-end gap-2 mt-2 pt-4 border-t border-gray-100">
+                <button onClick={() => setExtractedData(null)} className="px-4 py-2 text-sm font-medium border border-gray-200 text-gray-600 hover:bg-gray-50 rounded-lg transition">
+                  Back
+                </button>
+                <button onClick={handleSaveJob} disabled={saving}
+                  className="px-5 py-2 text-sm font-medium bg-violet-700 hover:bg-violet-800 text-white rounded-lg transition disabled:opacity-60 flex items-center gap-2">
+                  {saving && (
+                    <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  )}
+                  {saving ? 'Creating job & syncing tags...' : 'Confirm & Create Job'}
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </Modal>
+  );
+};
 
-export default JDUploader
+export default JDUploader;

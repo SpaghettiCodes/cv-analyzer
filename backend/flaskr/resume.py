@@ -13,28 +13,17 @@ from .ai_client import MODEL_NAME, client
 from .db import UPLOAD_DIR, jd_collection, pdf_collection
 from .tagsAPI import list_all_tags
 
+from concurrent.futures import ThreadPoolExecutor
+
 load_dotenv()
 
-GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN")
+GITHUB_USERNAME = os.environ.get("GITHUB_USERNAME")
 
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 TAGS_JSON = (
     '{"name": "candidate name", "github": "github username", '
     '"tag_ids": ["tagid1", "tagid2", "tagid3"]}'
-)
-
-JD_JSON = (
-    '{"title": "job title (string)","mode": "work location (string)",'
-    '"type": "employment type (string)","position": "job position (string)",'
-    '"location": "location of job (string)","description": "description of job (string)",'
-    '"qualifications": {"pastExperience": [{"name": "name of experience (string)",'
-    '"priority": "mandatory","minYears": 3}],'
-    '"technical": [{"name": "name of technical skill (string)",'
-    '"priority": "bonus","minYears": 2}],'
-    '"soft": [{"name": "name of soft skill (string)",'
-    '"priority": "normal","minYears": 1}]},'
-    '"responsibilities": ["responsibilities of work (string)"]}'
 )
 
 ANALYSIS_JSON = (
@@ -48,6 +37,28 @@ ANALYSIS_JSON = (
     '"qualified": "true / false (boolean)"}]}}'
 )
 
+JD_PARSED_SCHEMA = (
+    '{"title": "job title (string)","mode": "work location (string)",'
+    '"type": "employment type (string)","position": "job position (string)",'
+    '"location": "location of job (string)","description": "description of job (string)",'
+    '"qualifications": {"pastExperience": [{"name": "name of experience (string)",'
+    '"priority": "mandatory","minYears": 3}],'
+    '"technical": [{"name": "name of technical skill (string)",'
+    '"priority": "bonus","minYears": 2}],'
+    '"soft": [{"name": "name of soft skill (string)",'
+    '"priority": "normal","minYears": 1}]},'
+    '"responsibilities": ["responsibilities of work (string)"]}'
+)
+
+TAGS_SUGGESTION_SCHEMA = '{"tags": ["Tag 1", "Tag 2", "Tag 3", "Tag 4"]}'
+
+RESUME_NEW_TAGS_JSON = '{"tag_ids": ["tagid1", "tagid2"]}'
+
+PROFILE_JSON = (
+    '{"strong_aspects": ["aspect1", "aspect2", "aspect3"], '
+    '"interesting_facts": ["fact1", "fact2"], '
+    '"career_summary": "one sentence career snapshot"}'
+)
 
 def _pdf_path(resume_id):
     return os.path.join(UPLOAD_DIR, f"{resume_id}.pdf")
@@ -157,20 +168,32 @@ def openAI():
         return jsonify({"error": str(e)}), 500
 
 
-@api_bp.route("/parseJD", methods=["POST"])
-def parseJD():
-    if "File" not in request.files:
-        return jsonify({"error": "No file part in the request"}), 400
+TAG_JSON = '{"tag_name": "short role label (e.g. Frontend Engineer, Data Scientist, DevOps)"}'
 
-    if request.form.get("tags") is None:
-        return jsonify({"error": "No tags part in the request"}), 400
 
-    file = request.files["File"]
-    if file.filename == "":
-        return jsonify({"error": "No selected file"}), 400
+def _resolve_tag_names(tag_ids):
+    from .db import tags_collection
 
-    tags = request.form.to_dict(flat=True)["tags"].split(",")
-    extract_text = _extract_text_from_upload(file)
+    names = []
+    for tid in tag_ids or []:
+        if not ObjectId.is_valid(tid):
+            continue
+        tag = tags_collection.find_one({"_id": ObjectId(tid)})
+        if tag:
+            names.append(tag["tag_name"])
+    return names
+
+
+def _match_new_tags_for_resume(resume_id, new_tags):
+    """Return subset of new tag _ids that fit this resume (AI)."""
+    if not new_tags:
+        return []
+
+    text = _extract_text_from_stored_pdf(resume_id)
+    if not text:
+        return []
+
+    tags_payload = [{"_id": t["_id"], "tag_name": t["tag_name"]} for t in new_tags]
 
     try:
         chat_completion = client.chat.completions.create(
@@ -178,32 +201,163 @@ def parseJD():
                 {
                     "role": "system",
                     "content": (
-                        "You are a hr that takes in a job description as a string, extracts "
-                        "its information and outputs it in JSON.\n"
-                        f" The JSON object must use the schema:\n{JD_JSON}\n"
-                        "\n There can be multiple pastExperience, technical and soft. "
-                        "If a field has no matching value to the job description passed in, "
-                        "the field itself can be empty"
+                        "You are an HR assistant. Given a resume and a list of NEW tags, "
+                        "return only the tag _ids that genuinely match this candidate. "
+                        "Be conservative — only match clear fits.\n"
+                        f"Return JSON: {RESUME_NEW_TAGS_JSON}\n"
+                        f"Available new tags:\n{json.dumps(tags_payload)}"
                     ),
                 },
-                {
-                    "role": "user",
-                    "content": extract_text + "extract the job description",
-                },
+                {"role": "user", "content": text},
             ],
             model=MODEL_NAME,
             response_format={"type": "json_object"},
         )
-        data = json.loads(chat_completion.choices[0].message.content)
-        if not data.get("mode"):
-            data["mode"] = "Remote"
-        if not data.get("type"):
-            data["type"] = "Full Time"
-        jd_collection.insert_one({**data, "tags": tags})
-        return jsonify({"msg": "pdf uploaded successfully"}), 200
+        matched = json.loads(chat_completion.choices[0].message.content).get("tag_ids", [])
+        valid_ids = {t["_id"] for t in new_tags}
+        return [tid for tid in matched if tid in valid_ids]
+    except Exception:
+        return []
+
+
+def _apply_new_tags_to_resumes(new_tag_ids):
+    """After job upload creates tags, retroactively tag matching resumes."""
+    from .db import tags_collection
+
+    if not new_tag_ids:
+        return
+
+    new_tags = []
+    for tid in new_tag_ids:
+        if not ObjectId.is_valid(tid):
+            continue
+        doc = tags_collection.find_one({"_id": ObjectId(tid)})
+        if doc:
+            new_tags.append({"_id": tid, "tag_name": doc["tag_name"]})
+
+    if not new_tags:
+        return
+
+    for resume in pdf_collection.find({}):
+        resume_id = str(resume["_id"])
+        current = resume.get("tag_ids") or []
+        if not isinstance(current, list):
+            current = []
+
+        unseen = [t for t in new_tags if t["_id"] not in current]
+        if not unseen:
+            continue
+
+        matched = _match_new_tags_for_resume(resume_id, unseen)
+        if not matched:
+            continue
+
+        merged = list(current)
+        for tid in matched:
+            if tid not in merged:
+                merged.append(tid)
+        merged = merged[:3]
+
+        pdf_collection.update_one({"_id": resume["_id"]}, {"$set": {"tag_ids": merged}})
+
+
+def _get_or_create_tag(tag_name: str) -> tuple[str, bool]:
+    """Return (_id str, was_created)."""
+    from .db import tags_collection
+
+    existing = tags_collection.find_one({"tag_name": tag_name})
+    if existing:
+        return str(existing["_id"]), False
+    inserted = tags_collection.insert_one({"tag_name": tag_name})
+    return str(inserted.inserted_id), True
+
+
+@api_bp.route("/parseJD/analyze", methods=["POST"])
+def parse_jd_analyze():
+    if "File" not in request.files:
+        return jsonify({"error": "No file part in the request"}), 400
+
+    file = request.files["File"]
+    if file.filename == "":
+        return jsonify({"error": "No selected file"}), 400
+
+    extract_text = _extract_text_from_upload(file)
+
+    try:
+        jd_completion = client.chat.completions.create(
+            messages=[
+                {
+                    "role": "system",
+                    "content": (
+                        "You are a professional tech recruiter. Extract the info from this job description "
+                        f"and structure it exactly into this JSON format. Do not invent anything that isnt stated:\n{JD_PARSED_SCHEMA}"
+                    ),
+                },
+                {"role": "user", "content": extract_text},
+            ],
+            model=MODEL_NAME,
+            response_format={"type": "json_object"},
+        )
+        jd_data = json.loads(jd_completion.choices[0].message.content)
+
+        if not jd_data.get("mode"): jd_data["mode"] = "Remote"
+        if not jd_data.get("type"): jd_data["type"] = "Full Time"
+
+        tag_completion = client.chat.completions.create(
+            messages=[
+                {
+                    "role": "system",
+                    "content": (
+                        "Given this job description text, generate a list of 3-5 highly relevant skill or role tags "
+                        "(e.g., 'React', 'Python', 'DevOps', 'Agile'). Keep them 1-3 words max, Title Case.\n"
+                        f"Return only JSON matching this schema:\n{TAGS_SUGGESTION_SCHEMA}"
+                    ),
+                },
+                {"role": "user", "content": extract_text},
+            ],
+            model=MODEL_NAME,
+            response_format={"type": "json_object"},
+        )
+        tag_result = json.loads(tag_completion.choices[0].message.content)
+        suggested_tags = tag_result.get("tags", [])
+
+        return jsonify({
+            "extracted_data": jd_data,
+            "suggested_tags": suggested_tags
+        }), 200
+
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+
+@api_bp.route("/parseJD/confirm", methods=["POST"])
+def parse_jd_confirm():
+    payload = request.json
+    
+    extracted_data = payload.get("extracted_data")
+    final_tags = payload.get("final_tags", [])
+
+    if not extracted_data:
+        return jsonify({"error": "Missing job description data"}), 400
+
+    try:
+        tag_ids = []
+        newly_created = []
+        for tag_name in final_tags:
+            if tag_name.strip():
+                tid, created = _get_or_create_tag(tag_name.strip())
+                tag_ids.append(tid)
+                if created:
+                    newly_created.append(tid)
+
+        extracted_data["tags"] = tag_ids
+
+        jd_collection.insert_one(extracted_data)
+        _apply_new_tags_to_resumes(newly_created)
+        return jsonify({"message": "Job description and tags saved successfully!"}), 201
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 @api_bp.route("/getPDF", methods=["GET"])
 def getPDF():
@@ -254,57 +408,173 @@ def _analyse_single_resume(resume, job_description):
         )
         return {
             **json.loads(chat_completion.choices[0].message.content),
+            "id": str(resume["_id"]),
             "github": github_username,
         }
     except Exception:
         return None
 
-
 @api_bp.route("/job/analysis", methods=["GET"])
-def get_job_analysis():
+def job_analysis():
     job_id = request.args.get("id")
-    if job_id is None:
-        return jsonify({"error": "Job ID is required"}), 400
+    if not job_id:
+        return jsonify({"error": "Job description ID is required"}), 400
 
     if not ObjectId.is_valid(job_id):
-        return jsonify({"error": "Invalid Job ID format"}), 400
+        return jsonify({"error": "Invalid job description ID"}), 400
 
-    job = jd_collection.find_one({"_id": ObjectId(job_id)})
-    if not job:
-        return jsonify({"error": "Job not found"}), 404
+    jd = jd_collection.find_one({"_id": ObjectId(job_id)})
+    if not jd:
+        return jsonify({"error": "Job description not found"}), 404
+
+    jd.pop("_id", None)
+    jd_string = json.dumps(jd)
+
+    tag_ids = jd.get("tags", [])
+
+    if tag_ids:
+        query = {"tag_ids": {"$in": tag_ids}}
+    else:
+        return jsonify([]), 200
+
+    resumes = list(pdf_collection.find(query))
+    if not resumes:
+        return jsonify([]), 200
 
     analysis_all = []
-    for resume in _resumes_for_job(job):
-        analysis = _analyse_single_resume(resume, job)
-        if analysis is None:
-            continue
-        analysis["_id"] = resume["_id"]
-        analysis_all.append(analysis)
+    workers = min(len(resumes), 8) 
+    
+    with ThreadPoolExecutor(max_workers=workers) as executor:
+        futures = [executor.submit(_analyse_single_resume, resume, jd_string) for resume in resumes]
+
+        for future in futures:
+            res = future.result()
+            if res is not None:
+                analysis_all.append(res)
 
     return jsonify(analysis_all), 200
-
 
 @api_bp.route("/github", methods=["GET"])
 def github():
     username = request.args.get("username")
-    if username is None:
+    if not username:
         return jsonify({"error": "username non existent"}), 400
 
     headers = {
-        "Authorization": f"token {GITHUB_TOKEN}",
+        'User-Agent': GITHUB_USERNAME,
         "Accept": "application/vnd.github.v3+json",
     }
 
     repos_url = f"https://api.github.com/users/{username}/repos?type=public"
     repos_response = requests.get(repos_url, headers=headers, timeout=30)
+    if repos_response.status_code != 200:
+        return jsonify({"error": f"GitHub API error: {repos_response.status_code}"}), repos_response.status_code
+        
     repos = repos_response.json()
+    if isinstance(repos, dict) and "message" in repos:
+        return jsonify({"error": repos["message"]}), 400
+    if not isinstance(repos, list):
+        return jsonify({"error": "Unexpected structure from GitHub API"}), 500
 
     language_lines = defaultdict(int)
     for repo in repos:
+        if not isinstance(repo, dict) or "languages_url" not in repo:
+            continue
+        print(f"Trying {repo['languages_url']}")
         languages_response = requests.get(
             repo["languages_url"], headers=headers, timeout=30
         )
-        for language, lines in languages_response.json().items():
-            language_lines[language] += lines
+        print(languages_response)
+        if languages_response.status_code != 200:
+            continue
+        languages_data = languages_response.json()
+        if isinstance(languages_data, dict):
+            for language, lines in languages_data.items():
+                language_lines[language] += lines
 
+    print(f"Final result: {language_lines}")
     return jsonify(language_lines), 200
+
+@api_bp.route("/resume/profile", methods=["GET"])
+def resume_profile():
+    resume_id = request.args.get("id")
+    if not resume_id:
+        return jsonify({"error": "Resume id is required"}), 400
+    if not ObjectId.is_valid(resume_id):
+        return jsonify({"error": "Invalid resume id"}), 400
+
+    resume = pdf_collection.find_one({"_id": ObjectId(resume_id)})
+    if not resume:
+        return jsonify({"error": "Resume not found"}), 404
+
+    tag_ids = resume.get("tag_ids") or []
+    tag_names = _resolve_tag_names(tag_ids)
+
+    recommended_jobs = []
+    for jd in jd_collection.find({}):
+        job_tags = jd.get("tags") or []
+        overlap = [t for t in tag_ids if t in job_tags]
+        if overlap:
+            recommended_jobs.append({
+                "_id": str(jd["_id"]),
+                "title": jd.get("title", "Untitled"),
+                "mode": jd.get("mode", ""),
+                "location": jd.get("location", ""),
+                "match_count": len(overlap),
+            })
+    recommended_jobs.sort(key=lambda j: j["match_count"], reverse=True)
+    recommended_jobs = recommended_jobs[:5]
+
+    text = _extract_text_from_stored_pdf(resume_id)
+    profile = {"strong_aspects": [], "interesting_facts": [], "career_summary": ""}
+
+    if text:
+        try:
+            chat_completion = client.chat.completions.create(
+                messages=[
+                    {
+                        "role": "system",
+                        "content": (
+                            "You are a career coach. From this resume, extract standout strengths "
+                            "and interesting facts. Be specific and concise.\n"
+                            f"Return JSON:\n{PROFILE_JSON}"
+                        ),
+                    },
+                    {"role": "user", "content": text},
+                ],
+                model=MODEL_NAME,
+                response_format={"type": "json_object"},
+            )
+            profile = json.loads(chat_completion.choices[0].message.content)
+        except Exception:
+            pass
+
+    return jsonify({
+        "name": resume.get("name", ""),
+        "github": resume.get("github", ""),
+        "tag_names": tag_names,
+        "strong_aspects": profile.get("strong_aspects", []),
+        "interesting_facts": profile.get("interesting_facts", []),
+        "career_summary": profile.get("career_summary", ""),
+        "recommended_jobs": recommended_jobs,
+    }), 200
+
+
+@api_bp.route("/deleteResume", methods=["DELETE"])
+def deleteResume():
+    resume_id = request.args.get("id")
+    if not resume_id:
+        return make_response("Resume id is required.", 400)
+
+    if not ObjectId.is_valid(resume_id):
+        return make_response("Invalid resume id.", 400)
+
+    result = pdf_collection.delete_one({"_id": ObjectId(resume_id)})
+    if result.deleted_count == 0:
+        return make_response("Resume not found.", 404)
+
+    file_path = _pdf_path(resume_id)
+    if os.path.isfile(file_path):
+        os.remove(file_path)
+
+    return jsonify({"msg": "Resume deleted successfully"}), 200

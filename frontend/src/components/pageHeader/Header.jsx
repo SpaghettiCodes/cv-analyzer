@@ -1,13 +1,33 @@
 import React from "react";
 
 const PageHeader = () => {
-	return (
-		<div id="header" className='bg-[#1e1e1e]/[.58] w-screen h-16 flex gap-x-3 text-center font-semibold'>
-			<img src="/Experian-Logo.png" className="w-[7.6rem] h-[3.8rem]" />
-			<a href="/" className="cursor-pointer my-4 mr-6 text-2xl text-white hover:underline">Resumes</a>
-			<a href="/job" className="cursor-pointer my-4 mx-6 text-2xl text-white hover:underline">Jobs</a>
-		</div>
-	)
-}
+  const path = window.location.pathname;
 
-export default PageHeader
+  const navLink = (href, label) => {
+    const active = path === href || (href !== '/' && path.startsWith(href));
+    return (
+      <a
+        href={href}
+        className={`text-sm font-medium px-3 py-1.5 rounded-lg transition
+          ${active
+            ? 'bg-violet-700 text-white'
+            : 'text-gray-300 hover:text-white hover:bg-white/10'}`}
+      >
+        {label}
+      </a>
+    );
+  };
+
+  return (
+    <header className="bg-gray-900 border-b border-white/10 px-6 h-14 flex items-center gap-6 shrink-0">
+      <img src="/Experian-Logo.png" className="h-7 w-auto" alt="Experian" />
+      <div className="w-px h-5 bg-white/20" />
+      <nav className="flex gap-1">
+        {navLink('/', 'Resumes')}
+        {navLink('/job', 'Jobs')}
+      </nav>
+    </header>
+  );
+};
+
+export default PageHeader;
