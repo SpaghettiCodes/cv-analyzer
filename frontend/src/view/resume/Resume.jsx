@@ -6,7 +6,7 @@ import { SkeletonRows } from '../../components/LoadingSpinner';
 
 // ── Search bar ──────────────────────────────────────────────────────────────
 const SearchBar = ({ value, onChange }) => (
-  <div className="relative flex-1 max-w-sm">
+  <div className="relative flex-1 max-w-sm p-1">
     <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
       <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
     </svg>

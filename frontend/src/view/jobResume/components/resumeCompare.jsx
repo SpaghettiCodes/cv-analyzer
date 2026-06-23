@@ -163,7 +163,7 @@ const ResumeCompare = ({ candidateA, candidateB, maxQua, jobId }) => {
         </div>
       )}
 
-      <div className="flex gap-4 flex-1 min-h-3/4 overflow-y-auto">
+      <div className="flex gap-4 flex-1 min-h-[55%] overflow-y-auto">
         <CompareColumn candidate={candidateA} maxQua={maxQua} accent="border-violet-100 bg-violet-50/30" />
         <CompareColumn candidate={candidateB} maxQua={maxQua} accent="border-fuchsia-100 bg-fuchsia-50/30" />
       </div>

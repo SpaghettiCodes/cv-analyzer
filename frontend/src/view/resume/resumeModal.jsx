@@ -168,7 +168,7 @@ const DisplayPDFModal = ({ open, onClose, id }) => {
   return (
     <Modal open={open}>
       <div ref={modalRef}
-        className="bg-white rounded-lg shadow-2xl h-[58rem] w-[76rem] max-w-[95vw] flex overflow-hidden relative"
+        className="bg-white rounded-lg shadow-2xl h-[95vh] w-[65vw] max-w-[95vw] flex overflow-hidden relative"
       >
         <button onClick={onClose}
           className="absolute top-3 right-3 z-10 p-1.5 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition"

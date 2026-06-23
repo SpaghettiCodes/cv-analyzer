@@ -110,7 +110,7 @@ const FilterDropdown = ({ tags, anchorRef, onFilter, onClose }) => {
   const style = rect ? { top: rect.bottom + window.scrollY + 8, right: window.innerWidth - rect.right } : {};
 
   return (
-    <div ref={dropRef} className="fixed z-50 bg-white border border-gray-200 rounded-xl shadow-lg py-1.5 min-w-[160px]" style={style}>
+    <div ref={dropRef} className="fixed z-50 bg-white border border-gray-200 rounded-xl shadow-lg py-1.5 min-w-[160px] w-[160px] max-h-[60rem] overflow-y-auto" style={style}>
       <button onClick={() => { onFilter(null); onClose(); }}
         className="w-full text-left text-sm px-4 py-2 text-gray-700 hover:bg-gray-50 font-medium">
         All jobs

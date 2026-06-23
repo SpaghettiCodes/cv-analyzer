@@ -185,7 +185,6 @@ def _resolve_tag_names(tag_ids):
 
 
 def _match_new_tags_for_resume(resume_id, new_tags):
-    """Return subset of new tag _ids that fit this resume (AI)."""
     if not new_tags:
         return []
 
@@ -221,7 +220,6 @@ def _match_new_tags_for_resume(resume_id, new_tags):
 
 
 def _apply_new_tags_to_resumes(new_tag_ids):
-    """After job upload creates tags, retroactively tag matching resumes."""
     from .db import tags_collection
 
     if not new_tag_ids:
@@ -262,7 +260,6 @@ def _apply_new_tags_to_resumes(new_tag_ids):
 
 
 def _get_or_create_tag(tag_name: str) -> tuple[str, bool]:
-    """Return (_id str, was_created)."""
     from .db import tags_collection
 
     existing = tags_collection.find_one({"tag_name": tag_name})
