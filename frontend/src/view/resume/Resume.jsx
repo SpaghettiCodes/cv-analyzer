@@ -3,13 +3,12 @@ import PageHeader from '../../components/pageHeader/Header.jsx';
 import DisplayPDFModal from './resumeModal.jsx';
 import ResumeUploader from '../../components/ResumeUploader/ResumeUploader.jsx';
 import { SkeletonRows } from '../../components/LoadingSpinner';
+import { FileText, LoaderCircle, Search, Upload, Trash2 } from 'lucide-react';
 
 // ── Search bar ──────────────────────────────────────────────────────────────
 const SearchBar = ({ value, onChange }) => (
   <div className="relative flex-1 max-w-sm p-1">
-    <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-      <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
-    </svg>
+    <Search className='absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400' />
     <input
       type="text"
       placeholder="Search candidates…"
@@ -32,10 +31,7 @@ const UploadButton = ({ onUploaded }) => {
         className="flex items-center gap-2 bg-violet-700 hover:bg-violet-800 active:scale-95
                    text-white text-sm font-medium px-4 py-2 rounded-lg transition"
       >
-        <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-          <polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
-        </svg>
+        <Upload className='size-4' />
         Upload Resume
       </button>
       <ResumeUploader open={open} onClose={() => { setOpen(false); onUploaded(); }} />
@@ -72,8 +68,9 @@ const DeleteButton = ({ id, onDeleted }) => {
       title="Delete resume"
     >
       {loading
-        ? <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/></svg>
-        : <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
+        ? 
+        <LoaderCircle className='size-4 animate-spin' />
+        : <Trash2 className='size-4' />
       }
     </button>
   );
@@ -135,9 +132,7 @@ const ResumeRow = ({ resume, tagNames, tagsLoading, onDeleted }) => {
 const EmptyState = ({ filtered }) => (
   <div className="flex flex-col items-center justify-center py-20 text-center">
     <div className="w-14 h-14 rounded-2xl bg-violet-100 flex items-center justify-center mb-4">
-      <svg className="w-7 h-7 text-violet-400" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24">
-        <path d="M9 12h6m-6 4h6m2 5H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5.586a1 1 0 0 1 .707.293l5.414 5.414a1 1 0 0 1 .293.707V19a2 2 0 0 1-2 2z"/>
-      </svg>
+      <FileText className='size-7 text-violet-400' />
     </div>
     <p className="text-gray-700 font-medium">{filtered ? 'No results found' : 'No resumes yet'}</p>
     <p className="text-sm text-gray-400 mt-1">{filtered ? 'Try a different search term' : 'Upload a resume to get started'}</p>

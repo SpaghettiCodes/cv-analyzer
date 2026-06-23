@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { QualPriority } from "../../../constants";
+import { X, Check, Trash2 } from "lucide-react";
 
 // ── Priority styles ───────────────────────────────────────────────────────────
 const PRI = {
@@ -13,11 +14,11 @@ const getPri = (p) => PRI[p] || PRI[QualPriority.Normal];
 const StatusChip = ({ on }) => (
   on
     ? <span className="inline-flex items-center gap-1 text-xs font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full">
-        <svg className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg>
+        <Check className='size-3' />
         Pass
       </span>
     : <span className="inline-flex items-center gap-1 text-xs font-medium text-red-600 bg-red-50 border border-red-200 px-2 py-0.5 rounded-full">
-        <svg className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12"/></svg>
+        <X className="size-3" />
         Fail
       </span>
 );
@@ -111,6 +112,7 @@ const ResumeDetails = ({ viewing }) => {
           {github && (
             <a href={`https://github.com/${github}`} target="_blank" rel="noreferrer"
               className="text-sm text-violet-600 hover:underline mt-0.5 inline-flex items-center gap-1">
+                {/* git hub */}
               <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24">
                 <path d="M12 .5C5.65.5.5 5.65.5 12c0 5.1 3.3 9.42 7.87 10.95.58.1.79-.25.79-.56v-2.04c-3.2.7-3.87-1.54-3.87-1.54-.52-1.33-1.28-1.69-1.28-1.69-1.04-.71.08-.7.08-.7 1.15.08 1.76 1.18 1.76 1.18 1.02 1.75 2.68 1.24 3.33.95.1-.74.4-1.24.73-1.53-2.55-.29-5.23-1.27-5.23-5.67 0-1.25.45-2.27 1.18-3.07-.12-.29-.51-1.45.11-3.03 0 0 .96-.31 3.15 1.17a10.96 10.96 0 0 1 5.74 0c2.19-1.48 3.15-1.17 3.15-1.17.62 1.58.23 2.74.11 3.03.73.8 1.18 1.82 1.18 3.07 0 4.41-2.69 5.38-5.25 5.66.41.36.78 1.06.78 2.13v3.17c0 .31.21.67.8.56C20.7 21.42 24 17.1 24 12c0-6.35-5.15-11.5-12-11.5z"/>
               </svg>

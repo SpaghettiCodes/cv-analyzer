@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { QualPriority, JobMode, JobType } from '../../constants';
 import Modal from '../../components/Modal';
 import { Spinner } from '../../components/LoadingSpinner';
+import { Plus, RefreshCcw, Trash2, X } from 'lucide-react';
 
 // ── Priority color helpers ────────────────────────────────────────────────────
 const PRIORITY_STYLES = {
@@ -73,15 +74,11 @@ const ModifiableQualificationBean = ({ qualification, onClose, onDelete }) => {
       {/* cycle priority */}
       <button onClick={() => setData({ ...data, priority: CYCLE[(CYCLE.indexOf(data.priority) + 1) % CYCLE.length] })}
         className="ml-1 opacity-60 hover:opacity-100 transition" title="Cycle priority">
-        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
-          <path d="M2.5 2v6h6M21.5 22v-6h-6"/><path d="M22 11.5A10 10 0 0 0 3.2 7.2M2 12.5A10 10 0 0 0 20.8 16.8"/>
-        </svg>
+        <RefreshCcw className='size-3.5' />
       </button>
       {/* delete */}
       <button onClick={onDelete} className="ml-0.5 opacity-60 hover:opacity-100 hover:text-red-600 transition" title="Remove">
-        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
-          <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
-        </svg>
+        <X className='size-3.5' />
       </button>
     </div>
   );
@@ -93,9 +90,7 @@ const SectionHeader = ({ title, onAdd }) => (
     <h3 className="text-sm font-semibold uppercase tracking-wider text-gray-400">{title}</h3>
     <button onClick={onAdd}
       className="w-6 h-6 rounded-full bg-violet-100 hover:bg-violet-200 text-violet-700 flex items-center justify-center transition">
-      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
-        <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
-      </svg>
+        <Plus className='size-3.5' />
     </button>
   </div>
 );
@@ -112,9 +107,7 @@ const ResponsibilityItem = ({ content, onChange, onDelete }) => (
     />
     <button onClick={onDelete}
       className="mt-1.5 opacity-0 group-hover:opacity-100 text-gray-400 hover:text-red-500 transition shrink-0">
-      <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-        <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
-      </svg>
+        <X className='size-4' />
     </button>
   </li>
 );
@@ -205,11 +198,7 @@ const JobDescriptionModal = ({ job, open, onClose }) => {
             className="p-2 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 transition disabled:opacity-40" title="Delete job">
             {deleting
               ? <Spinner size="sm" />
-              : <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                  <polyline points="3 6 5 6 21 6"/>
-                  <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
-                  <path d="M10 11v6M14 11v6M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>
-                </svg>
+              : <Trash2 className='size-5' />
             }
           </button>
         </div>

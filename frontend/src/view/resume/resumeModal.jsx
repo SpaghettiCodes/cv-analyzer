@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import Modal from '../../components/Modal';
 import { LoadingBlock } from '../../components/LoadingSpinner';
+import { X } from 'lucide-react';
 
 const ProfilePanel = ({ profile, loading, error }) => {
   if (loading) {
@@ -173,9 +174,7 @@ const DisplayPDFModal = ({ open, onClose, id }) => {
         <button onClick={onClose}
           className="absolute top-3 right-3 z-10 p-1.5 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition"
           title="Close">
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-            <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
-          </svg>
+            <X className='size-5' />
         </button>
 
         <div className="flex-1 min-w-0 flex flex-col p-2">

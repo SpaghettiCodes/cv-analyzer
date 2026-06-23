@@ -4,6 +4,7 @@ import JDUploader from '../../components/JDUploader/JDUploader.jsx';
 import PageHeader from '../../components/pageHeader/Header.jsx';
 import { SkeletonCards } from '../../components/LoadingSpinner';
 import { useNavigate } from 'react-router-dom';
+import { BriefcaseBusiness, ListFilter, MapPin, Plus, Search, SquarePen } from 'lucide-react';
 
 const emptyJob = {
   _id: '', title: '', mode: 'Remote', type: 'Full Time',
@@ -69,10 +70,7 @@ const JobDescriptionCard = ({ job, onClick, isEditing }) => {
       {/* Location */}
       {job.location && (
         <p className="text-xs text-gray-400 flex items-center gap-1">
-          <svg className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-            <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/>
-            <circle cx="12" cy="9" r="2.5"/>
-          </svg>
+          <MapPin className='size-3' />
           {job.location}
         </p>
       )}
@@ -196,9 +194,7 @@ const JobDescriptions = () => {
           <div className="flex items-center gap-2 flex-wrap justify-end">
             {/* Search */}
             <div className="relative">
-              <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
-              </svg>
+              <Search className='absolute left-3 top-1/2 -translate-y-1/2 size-4 text-gray-400' />
               <input type="text" placeholder="Search jobs…" value={search} onChange={e => handleSearch(e.target.value)}
                 className="pl-9 pr-4 py-2 rounded-lg border border-gray-200 bg-white text-sm w-52
                            focus:outline-none focus:ring-2 focus:ring-violet-400 focus:border-transparent placeholder-gray-400 transition" />
@@ -207,9 +203,7 @@ const JobDescriptions = () => {
             {/* Filter */}
             <button ref={filterRef} onClick={() => setFilterOpen(v => !v)}
               className="flex items-center gap-1.5 text-sm px-3 py-2 rounded-lg border border-gray-200 bg-white hover:border-gray-300 text-gray-700 transition">
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                <line x1="4" y1="6" x2="20" y2="6"/><line x1="8" y1="12" x2="16" y2="12"/><line x1="11" y1="18" x2="13" y2="18"/>
-              </svg>
+                <ListFilter className='size-4' />
               Filter
             </button>
 
@@ -219,19 +213,14 @@ const JobDescriptions = () => {
                 ${isEditing
                   ? 'bg-amber-500 border-amber-500 text-white hover:bg-amber-600'
                   : 'bg-white border-gray-200 text-gray-700 hover:border-gray-300'}`}>
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
-                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
-              </svg>
+                <SquarePen className='size-4'/>
               {isEditing ? 'Done editing' : 'Edit'}
             </button>
 
             {/* New */}
             <button onClick={() => setJdUploaderOpen(true)}
               className="flex items-center gap-1.5 bg-violet-700 hover:bg-violet-800 active:scale-95 text-white text-sm font-medium px-4 py-2 rounded-lg transition">
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
-              </svg>
+                <Plus className='size-4' />
               New Job
             </button>
           </div>
@@ -243,10 +232,7 @@ const JobDescriptions = () => {
         ) : results.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-24 text-center">
             <div className="w-14 h-14 rounded-2xl bg-violet-100 flex items-center justify-center mb-4">
-              <svg className="w-7 h-7 text-violet-400" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24">
-                <path d="M20 7H4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2z"/>
-                <path d="M16 3H8a2 2 0 0 0-2 2v2h12V5a2 2 0 0 0-2-2z"/>
-              </svg>
+              <BriefcaseBusiness className='size-7 text-violet-400' />
             </div>
             <p className="text-gray-700 font-medium">{search ? 'No jobs match your search' : 'No job descriptions yet'}</p>
             <p className="text-sm text-gray-400 mt-1">{search ? 'Try a different term or clear the filter' : 'Click "New Job" to add your first listing'}</p>

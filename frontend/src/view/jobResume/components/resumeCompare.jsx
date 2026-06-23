@@ -1,5 +1,6 @@
 import React from 'react';
 import { QualPriority } from '../../../constants';
+import { Bot, Star } from 'lucide-react';
 
 const PRI = {
   [QualPriority.Mandatory]: 'text-red-600',
@@ -153,9 +154,7 @@ const ResumeCompare = ({ candidateA, candidateB, maxQua, jobId }) => {
     <div className="flex flex-col gap-5 h-full">
       {winner && (
         <div className="shrink-0 bg-gradient-to-r from-violet-50 to-fuchsia-50 border border-violet-100 rounded-xl px-5 py-3 flex items-center gap-3">
-          <svg className="w-5 h-5 text-violet-600 shrink-0" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-            <path d="M12 2l2.4 7.4H22l-6 4.6 2.3 7L12 17.8 5.7 21l2.3-7-6-4.6h7.6z"/>
-          </svg>
+          <Star className='w-5 h-5 text-violet-600 shrink-0' />
           <div>
             <p className="text-sm font-semibold text-gray-800">{winner} leads on qualifications</p>
             <p className="text-xs text-gray-500">{scoreA} vs {scoreB} matched out of {maxQua}</p>
@@ -175,9 +174,7 @@ const ResumeCompare = ({ candidateA, candidateB, maxQua, jobId }) => {
 
       <div className="shrink-0 border border-violet-100 rounded-xl p-5 bg-white shadow-sm flex flex-col gap-4">
         <div className="flex items-center gap-2">
-          <svg className="w-5 h-5 text-violet-500 shrink-0" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 21l8.904-4.43c1.002-.5 1.796-1.353 2.24-2.39a4.5 4.5 0 00-6.42-6.42c-1.037.444-1.89 1.238-2.39 2.24l-4.43 8.904L15.904 15M3 3l.01-.01M7.5 7.5l.01-.01M13.5 3.5l.01-.01M4 8.5l.01-.01M19 19l.01-.01" />
-          </svg>
+          <Bot className='size-5 text-violet-500 shrink-0' />
           <h3 className="text-xs font-bold uppercase tracking-wider text-gray-800">AI Pros & Cons Deep Dive</h3>
         </div>
 
