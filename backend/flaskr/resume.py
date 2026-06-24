@@ -5,14 +5,15 @@ from collections import defaultdict
 import requests
 from bson import ObjectId
 from dotenv import load_dotenv
-from flask import jsonify, make_response, request, send_file
+from flask import jsonify, make_response, request, send_file, current_app
 from pypdf import PdfReader
 
 from . import api_bp
 from .ai_client import MODEL_NAME, client
 from .db import UPLOAD_DIR, jd_collection, pdf_collection
 from .tagsAPI import list_all_tags
-
+from .task_model import Task
+from .prompts import *
 from concurrent.futures import ThreadPoolExecutor
 
 load_dotenv()
@@ -20,45 +21,6 @@ load_dotenv()
 GITHUB_USERNAME = os.environ.get("GITHUB_USERNAME")
 
 os.makedirs(UPLOAD_DIR, exist_ok=True)
-
-TAGS_JSON = (
-    '{"name": "candidate name", "github": "github username", '
-    '"tag_ids": ["tagid1", "tagid2", "tagid3"]}'
-)
-
-ANALYSIS_JSON = (
-    '{"name": "name", "summary": "short summary of past experiences.", '
-    '"highlights": ["highlight1", "highlight2", "highlight3", "highlight4", "highlight5"], '
-    '"qualifications": {"pastExperience": [{"name": "name of past experience", '
-    '"priority": "priority", "minYears": 0, "qualified": "true / false (boolean)"}], '
-    '"technical": [{"name": "name of technical skill", "priority": "priority", '
-    '"minYears": 0, "qualified": "true / false (boolean)"}], '
-    '"soft": [{"name": "name of soft skill", "priority": "priority", "minYears": 0, '
-    '"qualified": "true / false (boolean)"}]}}'
-)
-
-JD_PARSED_SCHEMA = (
-    '{"title": "job title (string)","mode": "work location (string)",'
-    '"type": "employment type (string)","position": "job position (string)",'
-    '"location": "location of job (string)","description": "description of job (string)",'
-    '"qualifications": {"pastExperience": [{"name": "name of experience (string)",'
-    '"priority": "mandatory","minYears": 3}],'
-    '"technical": [{"name": "name of technical skill (string)",'
-    '"priority": "bonus","minYears": 2}],'
-    '"soft": [{"name": "name of soft skill (string)",'
-    '"priority": "normal","minYears": 1}]},'
-    '"responsibilities": ["responsibilities of work (string)"]}'
-)
-
-TAGS_SUGGESTION_SCHEMA = '{"tags": ["Tag 1", "Tag 2", "Tag 3", "Tag 4"]}'
-
-RESUME_NEW_TAGS_JSON = '{"tag_ids": ["tagid1", "tagid2"]}'
-
-PROFILE_JSON = (
-    '{"strong_aspects": ["aspect1", "aspect2", "aspect3"], '
-    '"interesting_facts": ["fact1", "fact2"], '
-    '"career_summary": "one sentence career snapshot"}'
-)
 
 def _pdf_path(resume_id):
     return os.path.join(UPLOAD_DIR, f"{resume_id}.pdf")
@@ -136,42 +98,9 @@ def openAI():
         return jsonify({"error": "No selected file"}), 400
 
     inserted_id = _store_pdf(file)
-    extract_text = _extract_text_from_upload(file)
-
-    try:
-        chat_completion = client.chat.completions.create(
-            messages=[
-                {
-                    "role": "system",
-                    "content": (
-                        "You are a HR that takes in a resume as text, your job is to match "
-                        "which tags best suits the resume. The tags will be passed to you in json form\n"
-                        f"The JSON object you return will be in this format:\n{TAGS_JSON}\n"
-                        "the return JSON object must have between 1 to 3 _id in an array form ("
-                        "you may go over this limit if you feel its suitable, "
-                        "do not force assign tags just to have some) "
-                        "and only the id, and also the candidate name from the resume\n"
-                        f"Here are the tag name, _id and description:\n{list_all_tags()}\n"
-                        'if "github" / "name" cant be found remove the field'
-                    ),
-                },
-                {
-                    "role": "user",
-                    "content": "match the tags that fit this resume:\n" + extract_text,
-                },
-            ],
-            model=MODEL_NAME,
-            response_format={"type": "json_object"},
-        )
-        result = json.loads(chat_completion.choices[0].message.content)
-        _update_pdf_metadata(inserted_id, result)
-        return jsonify({"msg": result}), 200
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
-
-TAG_JSON = '{"tag_name": "short role label (e.g. Frontend Engineer, Data Scientist, DevOps)"}'
-
+    service = current_app.task_service
+    service.create_resume_task(inserted_id)
+    return jsonify({"msg": 'ok'}), 200
 
 def _resolve_tag_names(tag_ids):
     from .db import tags_collection
@@ -184,7 +113,6 @@ def _resolve_tag_names(tag_ids):
         if tag:
             names.append(tag["tag_name"])
     return names
-
 
 def _match_new_tags_for_resume(resume_id, new_tags):
     if not new_tags:
@@ -279,54 +207,13 @@ def parse_jd_analyze():
     if file.filename == "":
         return jsonify({"error": "No selected file"}), 400
 
-    extract_text = _extract_text_from_upload(file)
+    import uuid
+    file_path = os.path.join(UPLOAD_DIR, f"{uuid.uuid4()}_jd.pdf")
+    file.save(file_path)
 
-    try:
-        jd_completion = client.chat.completions.create(
-            messages=[
-                {
-                    "role": "system",
-                    "content": (
-                        "You are a professional tech recruiter. Extract the info from this job description "
-                        f"and structure it exactly into this JSON format. Do not invent anything that isnt stated:\n{JD_PARSED_SCHEMA}"
-                    ),
-                },
-                {"role": "user", "content": extract_text},
-            ],
-            model=MODEL_NAME,
-            response_format={"type": "json_object"},
-        )
-        jd_data = json.loads(jd_completion.choices[0].message.content)
-
-        if not jd_data.get("mode"): jd_data["mode"] = "Remote"
-        if not jd_data.get("type"): jd_data["type"] = "Full Time"
-
-        tag_completion = client.chat.completions.create(
-            messages=[
-                {
-                    "role": "system",
-                    "content": (
-                        "Given this job description text, generate a list of 3-5 highly relevant skill or role tags "
-                        "(e.g., 'React', 'Python', 'DevOps', 'Agile'). Keep them 1-3 words max, Title Case.\n"
-                        f"Return only JSON matching this schema:\n{TAGS_SUGGESTION_SCHEMA}"
-                    ),
-                },
-                {"role": "user", "content": extract_text},
-            ],
-            model=MODEL_NAME,
-            response_format={"type": "json_object"},
-        )
-        tag_result = json.loads(tag_completion.choices[0].message.content)
-        suggested_tags = tag_result.get("tags", [])
-
-        return jsonify({
-            "extracted_data": jd_data,
-            "suggested_tags": suggested_tags
-        }), 200
-
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
+    service = current_app.task_service
+    task = service.create_jd_task(file_path, file.filename)
+    return jsonify({"msg": "ok", "task_id": task.id}), 200
 
 @api_bp.route("/parseJD/confirm", methods=["POST"])
 def parse_jd_confirm():
@@ -334,11 +221,13 @@ def parse_jd_confirm():
     
     extracted_data = payload.get("extracted_data")
     final_tags = payload.get("final_tags", [])
+    task_id = payload.get("task_id")
 
     if not extracted_data:
         return jsonify({"error": "Missing job description data"}), 400
 
     try:
+        from datetime import datetime, timezone
         tag_ids = []
         newly_created = []
         for tag_name in final_tags:
@@ -351,7 +240,20 @@ def parse_jd_confirm():
         extracted_data["tags"] = tag_ids
 
         jd_collection.insert_one(extracted_data)
-        _apply_new_tags_to_resumes(newly_created)
+            
+        service = current_app.task_service
+
+        if task_id:
+            try:
+                task = service.load(task_id)
+                task.status = "completed"
+                task.finished_at = datetime.now(timezone.utc)
+                service.save(task)
+                service.broadcast_tasks()
+            except Exception as e:
+                print(f"Error completing task {task_id}: {e}")
+
+        service.create_sync_task(newly_created)        
         return jsonify({"message": "Job description and tags saved successfully!"}), 201
 
     except Exception as e:

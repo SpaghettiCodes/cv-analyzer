@@ -24,6 +24,7 @@ const PageHeader = () => {
       <nav className="flex gap-1">
         {navLink('/', 'Resumes')}
         {navLink('/job', 'Jobs')}
+        {navLink('/tasks', 'Tasks')}
       </nav>
     </header>
   );

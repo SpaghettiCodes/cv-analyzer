@@ -22,5 +22,6 @@ db = mongo_client["experian"]
 tags_collection = db["tags"]
 pdf_collection = db["pdf"]
 jd_collection = db["jobDescription"]
+task_collection = db['tasks']
 
 UPLOAD_DIR = os.environ.get("UPLOAD_DIR")

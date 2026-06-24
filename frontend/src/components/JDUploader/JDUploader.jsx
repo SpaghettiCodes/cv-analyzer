@@ -10,12 +10,14 @@ const JDUploader = ({ open, onClose }) => {
   const [extractedData, setExtractedData] = useState(null);
   const [tagsList, setTagsList] = useState([]);
   const [customTag, setCustomTag] = useState("");
+  const [activeTaskId, setActiveTaskId] = useState(null);
 
   useEffect(() => {
     if (!open) {
       setExtractedData(null);
       setTagsList([]);
       setCustomTag("");
+      setActiveTaskId(null);
       return;
     }
     const handler = (e) => {
@@ -25,8 +27,41 @@ const JDUploader = ({ open, onClose }) => {
     return () => document.removeEventListener('mousedown', handler);
   }, [open]);
 
+  useEffect(() => {
+    if (!activeTaskId) return;
+    
+    let intervalId;
+    const pollTask = async () => {
+      try {
+        const res = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/tasks/${activeTaskId}`);
+        if (!res.ok) return;
+        const task = await res.json();
+        
+        if (task.status === "pending-user-input") {
+          clearInterval(intervalId);
+          setExtractedData(task.payload?.extracted_data || {});
+          setTagsList(task.payload?.suggested_tags || []);
+          setProcessing(false);
+        } else if (task.status === "failed") {
+          clearInterval(intervalId);
+          alert("Job description analysis failed: " + (task.error || "Unknown error"));
+          setProcessing(false);
+          setActiveTaskId(null);
+        }
+      } catch (err) {
+        console.error("Error polling task:", err);
+      }
+    };
+    
+    intervalId = setInterval(pollTask, 1500);
+    pollTask();
+    
+    return () => clearInterval(intervalId);
+  }, [activeTaskId]);
+
   const uploadPDF = async (files) => {
     try {
+      setProcessing(true);
       const formData = new FormData();
       formData.append('File', files[0]);
       
@@ -37,10 +72,10 @@ const JDUploader = ({ open, onClose }) => {
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || 'Upload failed');
       
-      setExtractedData(json.extracted_data);
-      setTagsList(json.suggested_tags || []);
+      setActiveTaskId(json.task_id);
     } catch (err) {
       alert(err.message);
+      setProcessing(false);
     }
   };
 
@@ -65,6 +100,7 @@ const JDUploader = ({ open, onClose }) => {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          task_id: activeTaskId,
           extracted_data: extractedData,
           final_tags: tagsList
         }),

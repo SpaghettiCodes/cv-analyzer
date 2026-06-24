@@ -1,18 +1,67 @@
-from flask import Flask
-from flask_cors import CORS
+from gevent import monkey
+monkey.patch_all()
 
+from flask import Flask, jsonify, current_app
+from flask_cors import CORS
+from flask_socketio import SocketIO, emit, join_room, leave_room
 from flaskr import api_bp
+from .tasks import TaskService
+from .mapper import task_to_summary
+from .db import pdf_collection
+from bson import ObjectId
+import json
 
 app = Flask(__name__)
+socketio = SocketIO(app, cors_allowed_origins="*", async_mode='gevent_uwsgi')
+task_service = TaskService(socketio)
+app.task_service = task_service
+task_service.start_worker()
+
 CORS(app, resources={r"/api/*": {"origins": "*"}})
 
 app.register_blueprint(api_bp, url_prefix="/api")
 
+@app.route("/api/tasks", methods=["GET"])
+def list_tasks_api():
+    tasks = task_service.list_tasks()
+    return jsonify([task_to_summary(t) for t in tasks])
 
-@app.route("/")
-def home():
-    return "Welcome to the Flask API!"
+@app.route("/api/tasks/<task_id>", methods=["GET"])
+def get_task_api(task_id):
+    try:
+        task = task_service.load(task_id)
+        summary = task_to_summary(task)
+        
+        if task.status == "completed":
+            if task.type == "resume":
+                resume_doc = pdf_collection.find_one({"_id": ObjectId(task.payload.resume)})
+                if resume_doc:
+                    resume_doc["_id"] = str(resume_doc["_id"])
+                    summary["content"] = json.dumps(resume_doc, indent=2)
+            elif task.type == "jd_sync":
+                summary["content"] = f"Successfully synced tags: {task.payload.new_tags}"
+        elif task.status == "pending-user-input" and task.type == "jd":
+            summary["content"] = json.dumps(task.payload.extracted_data, indent=2)
 
+        return jsonify(summary)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 404
+
+@socketio.on('connect', namespace='/ws')
+def handle_tasks_connect():
+    summaries = [task_to_summary(task) for task in task_service.list_tasks()]
+    emit('snapshot', summaries)
+    join_room('task_updates')
+
+@socketio.on('disconnect', namespace='/ws')
+def handle_tasks_disconnect():
+    leave_room('task_updates')
+
+@app.teardown_appcontext
+def shutdown_worker(exception=None):
+    task_service = getattr(current_app, 'task_service', None)
+    if task_service is not None:
+        task_service.stop_worker()
 
 if __name__ == "__main__":
-    app.run(debug=True, host="0.0.0.0")
+    socketio.run(app, debug=True, host="0.0.0.0")
