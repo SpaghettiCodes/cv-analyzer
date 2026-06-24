@@ -246,7 +246,7 @@ export function TasksPanel() {
 
   const renderTaskRow = (task) => {
     const duration = formatDuration(task.started_at, task.finished_at);
-    const isClickable = task.status === "completed" || task.status === "pending-user-input";
+    const isClickable = task.status === "pending-user-input";
 
     return (
       <div

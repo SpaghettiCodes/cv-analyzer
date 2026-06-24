@@ -5,6 +5,7 @@ import PageHeader from '../../components/pageHeader/Header.jsx';
 import { SkeletonCards } from '../../components/LoadingSpinner';
 import { useNavigate } from 'react-router-dom';
 import { BriefcaseBusiness, ListFilter, MapPin, Plus, Search, SquarePen } from 'lucide-react';
+import { useTasks } from '../../context/TaskContext.jsx';
 
 const emptyJob = {
   _id: '', title: '', mode: 'Remote', type: 'Full Time',
@@ -126,6 +127,7 @@ const FilterDropdown = ({ tags, anchorRef, onFilter, onClose }) => {
 
 // ── Page ──────────────────────────────────────────────────────────────────────
 const JobDescriptions = () => {
+  const { tasks } = useTasks();
   const nav = useNavigate();
   const [allJobs, setAllJobs] = useState([]);
   const [results, setResults] = useState([]);
@@ -139,6 +141,12 @@ const JobDescriptions = () => {
   const [loading, setLoading] = useState(true);
   const filterRef = useRef(null);
   const editButtonRef = useRef(null);
+  const navigate = useNavigate()
+
+  useEffect(() => {
+    const hasCompleted = tasks.some(t => t.type === 'jd_sync' && t.status === 'completed');
+    if (hasCompleted) getJobDescs(setAllJobs);
+  }, [tasks]);
 
   useEffect(() => {
     setLoading(true);
@@ -172,6 +180,7 @@ const JobDescriptions = () => {
         await Promise.all([getAllTags(setTags), getJobDescs(setAllJobs)]);
         setLoading(false);
         setJdUploaderOpen(false);
+        navigate('/tasks')
       }} />
       <JobDescriptionModal
         job={currentJob}

@@ -10,6 +10,7 @@ from .mapper import task_to_summary
 from .db import pdf_collection
 from bson import ObjectId
 import json
+import signal
 
 app = Flask(__name__)
 socketio = SocketIO(app, cors_allowed_origins="*", async_mode='gevent_uwsgi')
@@ -57,11 +58,12 @@ def handle_tasks_connect():
 def handle_tasks_disconnect():
     leave_room('task_updates')
 
-@app.teardown_appcontext
-def shutdown_worker(exception=None):
-    task_service = getattr(current_app, 'task_service', None)
-    if task_service is not None:
-        task_service.stop_worker()
+def _handle_shutdown(signum, frame):
+    task_service.stop_worker()
+
+signal.signal(signal.SIGTERM, _handle_shutdown)
+signal.signal(signal.SIGINT, _handle_shutdown)
+
 
 if __name__ == "__main__":
     socketio.run(app, debug=True, host="0.0.0.0")

@@ -152,23 +152,29 @@ class TaskService:
             self._worker_task = None
 
     def _worker_loop(self) -> None:
-        while not self._shutdown.is_set():
-            print('checking')
-            self._reconcile_pending_tasks()
-            print("added pending tasks")
-            try:
-                task_id = self._queue.get(timeout=1.0)
-                print(f"t: {task_id}")
-            except Exception:
-                continue
+        try:
+            while not self._shutdown.is_set():
+                gevent.sleep(0)  # ← yield to hub on every iteration
+                print('checking')
+                self._reconcile_pending_tasks()
+                print("added pending tasks")
+                try:
+                    task_id = self._queue.get(timeout=1.0)
+                    print(f"t: {task_id}")
+                except Exception:
+                    continue
 
-            if self._shutdown.is_set():
-                break
+                if self._shutdown.is_set():
+                    break
 
-            try:
-                self._run_task(task_id)
-            except Exception:
-                continue
+                try:
+                    self._run_task(task_id)
+                except Exception:
+                    continue
+        except Exception as e:
+            print(f"WORKER LOOP DIED: {e}")
+        finally:
+            print("WORKER LOOP EXITED")
 
     def _reconcile_pending_tasks(self) -> None:
         now = time.time()
@@ -177,6 +183,7 @@ class TaskService:
         self._last_reconcile = now
 
         for task in self.list_tasks():
+            gevent.sleep(0)
             if task.status == "pending":
                 self._enqueue(task.id)
 
@@ -194,7 +201,7 @@ class TaskService:
         task.started_at = datetime.now(timezone.utc)
         task.error = None
         self.save(task)
-        self.broadcast_tasks()
+        self._schedule_broadcast()
 
         try:
             if task.type == "resume":
@@ -217,7 +224,7 @@ class TaskService:
             task.finished_at = datetime.now(timezone.utc)
         finally:
             self.save(task)
-            self.broadcast_tasks()
+            self._schedule_broadcast()
 
     def create_resume_task(self, resume_id):
         from .db import pdf_collection
