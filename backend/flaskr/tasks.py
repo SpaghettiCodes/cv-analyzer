@@ -153,13 +153,10 @@ class TaskService:
     def _worker_loop(self) -> None:
         try:
             while not self._shutdown.is_set():
-                gevent.sleep(0)  # ← yield to hub on every iteration
-                print('checking')
+                gevent.sleep(0)
                 self._reconcile_pending_tasks()
-                print("added pending tasks")
                 try:
                     task_id = self._queue.get(timeout=1.0)
-                    print(f"t: {task_id}")
                 except Exception:
                     continue
 
@@ -273,7 +270,6 @@ class TaskService:
         )
         result = json.loads(chat_completion.choices[0].message.content)
         _update_pdf_metadata(ObjectId(resume_id), result)
-        print('task completed')
 
     def create_jd_task(self, file_path, filename):
         task = Task.create_jd(
