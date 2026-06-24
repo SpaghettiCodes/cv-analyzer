@@ -1,8 +1,7 @@
 import { useState, useEffect } from "react";
-import { formatDate, getTask } from "../../api/client";
+import { formatDate } from "../../api/client";
 import { cn } from "../lib/cn";
 import { useTasks } from "../../context/TaskContext";
-import { GenerateResultModal } from "./GenerateResultModal";
 import PageHeader from "../../components/pageHeader/Header.jsx";
 
 const STATUS_LABEL = {
@@ -46,16 +45,6 @@ function taskDescription(task) {
     return "Syncing updated tags across candidates";
   }
   return task.output_name || task.id;
-}
-
-function resultTitle(taskType) {
-  if (taskType === "resume") {
-    return "Resume Parsing Details";
-  }
-  if (taskType === "jd") {
-    return "Job Description Extraction";
-  }
-  return "Sync Details";
 }
 
 function JDTaskConfirmModal({ open, task, onClose, onConfirmed }) {
@@ -190,12 +179,6 @@ function JDTaskConfirmModal({ open, task, onClose, onConfirmed }) {
 
 export function TasksPanel() {
   const { tasks, loading, error, refreshTasks } = useTasks();
-  const [modalOpen, setModalOpen] = useState(false);
-  const [modalLoading, setModalLoading] = useState(false);
-  const [modalError, setModalError] = useState(null);
-  const [resultContent, setResultContent] = useState("");
-  const [outputName, setOutputName] = useState("");
-  const [modalTitle, setModalTitle] = useState("Task Result");
 
   // User input state
   const [selectedJdTask, setSelectedJdTask] = useState(null);
@@ -212,35 +195,10 @@ export function TasksPanel() {
     refreshTasks();
   }, []);
 
-  const handleTaskClick = async (task) => {
+  const handleTaskClick = (task) => {
     if (task.status === "pending-user-input" && task.type === "jd") {
       setSelectedJdTask(task);
       setJdConfirmModalOpen(true);
-      return;
-    }
-
-    if (task.status !== "completed") {
-      return;
-    }
-
-    setModalOpen(true);
-    setModalLoading(true);
-    setModalError(null);
-    setResultContent("");
-    setOutputName("");
-    setModalTitle(resultTitle(task.type));
-
-    try {
-      const detail = await getTask(task.id);
-      if (!detail.content) {
-        throw new Error("The output file or details are missing.");
-      }
-      setResultContent(detail.content);
-      setOutputName(detail.output_name || detail.id);
-    } catch (err) {
-      setModalError(err instanceof Error ? err.message : "Failed to load result");
-    } finally {
-      setModalLoading(false);
     }
   };
 
@@ -300,18 +258,15 @@ export function TasksPanel() {
         )}
         {task.status === "pending-user-input" && (
           <p className="mt-2 text-sm text-amber-700 font-semibold bg-amber-50 p-2.5 rounded-lg border border-amber-100">
-            👉 Click here to review suggested tags and complete job creation
+            Click here to review suggested tags and complete job creation
           </p>
-        )}
-        {task.status === "completed" && (
-          <p className="mt-2 text-xs text-gray-400">Click to view execution summary</p>
         )}
       </div>
     );
   };
 
   return (
-    <div className="flex flex-col min-h-screen bg-gray-50">
+    <div className="flex flex-col h-screen bg-gray-50">
       <PageHeader />
 
       <main className="max-w-4xl mx-auto w-full px-6 py-10 flex flex-col gap-8 flex-1 overflow-hidden">
@@ -355,22 +310,6 @@ export function TasksPanel() {
           </div>
         </div>
       </main>
-
-      <GenerateResultModal
-        open={modalOpen}
-        loading={modalLoading}
-        error={modalError}
-        content={resultContent}
-        filename={outputName}
-        title={modalTitle}
-        onClose={() => {
-          if (modalLoading) {
-            return;
-          }
-          setModalOpen(false);
-          setModalError(null);
-        }}
-      />
 
       <JDTaskConfirmModal
         open={jdConfirmModalOpen}

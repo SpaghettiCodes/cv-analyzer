@@ -4,7 +4,6 @@ import DisplayPDFModal from './resumeModal.jsx';
 import ResumeUploader from '../../components/ResumeUploader/ResumeUploader.jsx';
 import { SkeletonRows } from '../../components/LoadingSpinner';
 import { FileText, LoaderCircle, Search, Upload, Trash2 } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
 import { useTasks } from '../../context/TaskContext.jsx';
 
 // ── Search bar ──────────────────────────────────────────────────────────────
@@ -25,7 +24,6 @@ const SearchBar = ({ value, onChange }) => (
 
 // ── Upload button ────────────────────────────────────────────────────────────
 const UploadButton = ({ onUploaded }) => {
-  const navigate = useNavigate()
   const [open, setOpen] = useState(false);
   return (
     <>
@@ -37,7 +35,7 @@ const UploadButton = ({ onUploaded }) => {
         <Upload className='size-4' />
         Upload Resume
       </button>
-      <ResumeUploader open={open} onClose={() => { setOpen(false); onUploaded(); navigate('/tasks') }} />
+      <ResumeUploader open={open} onClose={() => { setOpen(false); onUploaded(); }} />
     </>
   );
 };

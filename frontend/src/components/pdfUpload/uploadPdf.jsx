@@ -26,12 +26,12 @@ const PDFUploader = ({ onClose, setProcessing, onUpload, children }) => {
 
   return (
     <div className="flex flex-col gap-4 w-full">
-      <input ref={fileRef} type="file" accept="application/pdf" id="upload-pdf" className="sr-only"
+      <input ref={fileRef} type="file" accept="application/pdf" id="upload-pdf" multiple className="sr-only"
         onChange={e => setFiles(e.target.files)} />
       <label htmlFor="upload-pdf" className="cursor-pointer">
         <div
           className={`flex flex-col items-center justify-center gap-3 rounded-2xl border-2 border-dashed
-            h-44 transition
+            h-44 transition p-4
             ${drag ? 'border-violet-500 bg-violet-50 scale-[1.02]' : hasFile ? 'border-violet-400 bg-violet-50' : 'border-gray-200 bg-gray-50 hover:border-violet-300 hover:bg-violet-50/50'}`}
           onDrop={handleDrop}
           onDragOver={preventDefaults}
@@ -43,8 +43,12 @@ const PDFUploader = ({ onClose, setProcessing, onUpload, children }) => {
               <div className="w-10 h-10 rounded-xl bg-violet-100 flex items-center justify-center">
                 <FileCheck className='size-5 text-violet-600' />
               </div>
-              <p className="text-sm font-medium text-violet-700">{files[0].name}</p>
-              <p className="text-xs text-gray-400">Click to change file</p>
+              <div className="flex flex-col gap-1 w-full px-4 max-h-24 overflow-y-auto">
+                {Array.from(files).map((file, i) => (
+                  <p key={i} className="text-xs font-medium text-violet-700 truncate min-h-[1.5rem]">{file.name}</p>
+                ))}
+              </div>
+              <p className="text-xs text-gray-400">Click to change files</p>
             </>
           ) : (
             <>

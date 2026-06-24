@@ -17,7 +17,6 @@ from .task_model import *
 import json
 from bson import ObjectId
 import pymongo
-import gevent.threadpool
 
 class TaskService:
     def __init__(self, socketio: SocketIO) -> None:
@@ -247,13 +246,9 @@ class TaskService:
         pdf_content = _extract_text_from_stored_pdf(resume_id)
         if not pdf_content:
             raise Exception(f"Unable to extract text from resume {resume_id}")
-        print('got pdf content')
 
-        print('ai-ing')
-        chat_completion = gevent.threadpool.ThreadPool(4).apply(
-            client.chat.completions.create,
-            kwds={
-                'messages': [
+        chat_completion = client.chat.completions.create(
+            messages=[
                     {
                         "role": "system",
                         "content": (
@@ -273,14 +268,10 @@ class TaskService:
                         "content": "match the tags that fit this resume:\n" + pdf_content,
                     },
                 ],
-                'model': MODEL_NAME,
-                'response_format': {"type": "json_object"},
-            }
+            model=MODEL_NAME,
+            response_format={"type": "json_object"},
         )
-        print('ai done - extracting value')
-        print(type(chat_completion))
         result = json.loads(chat_completion.choices[0].message.content)
-        print('ai done')
         _update_pdf_metadata(ObjectId(resume_id), result)
         print('task completed')
 

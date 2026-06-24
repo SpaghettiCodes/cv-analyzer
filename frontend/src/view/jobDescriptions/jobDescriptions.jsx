@@ -141,7 +141,6 @@ const JobDescriptions = () => {
   const [loading, setLoading] = useState(true);
   const filterRef = useRef(null);
   const editButtonRef = useRef(null);
-  const navigate = useNavigate()
 
   useEffect(() => {
     const hasCompleted = tasks.some(t => t.type === 'jd_sync' && t.status === 'completed');
@@ -176,11 +175,7 @@ const JobDescriptions = () => {
       <PageHeader />
 
       <JDUploader open={jdUploaderOpen} onClose={async () => {
-        setLoading(true);
-        await Promise.all([getAllTags(setTags), getJobDescs(setAllJobs)]);
-        setLoading(false);
         setJdUploaderOpen(false);
-        navigate('/tasks')
       }} />
       <JobDescriptionModal
         job={currentJob}

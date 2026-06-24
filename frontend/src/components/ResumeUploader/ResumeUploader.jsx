@@ -2,10 +2,12 @@ import { useEffect, useRef, useState } from "react";
 import PDFUploader from "../pdfUpload/uploadPdf";
 import Modal from "../Modal";
 import { LoaderCircle } from "lucide-react";
+import { useNavigate } from 'react-router-dom';
 
 const ResumeUploader = ({ open, onClose }) => {
   const modalRef = useRef(null);
   const [processing, setProcessing] = useState(false);
+  const navigate = useNavigate()
 
   useEffect(() => {
     if (!open) return;
@@ -17,11 +19,14 @@ const ResumeUploader = ({ open, onClose }) => {
   }, [open]);
 
   const uploadPDF = async (files) => {
-    const formData = new FormData();
-    formData.append('File', files[0]);
-    const res = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/ai`, { method: 'POST', body: formData });
-    if (!res.ok) throw new Error('Upload failed')
-    else onClose();
+    for (const file of Array.from(files)) {
+      const formData = new FormData();
+      formData.append('File', file);
+      const res = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/ai`, { method: 'POST', body: formData });
+      if (!res.ok) throw new Error(`Upload failed for ${file.name}`);
+    }
+    onClose();
+    navigate('/tasks');
   };
 
   return (

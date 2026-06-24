@@ -2,10 +2,12 @@ import { useEffect, useRef, useState } from "react";
 import PDFUploader from "../pdfUpload/uploadPdf";
 import Modal from "../Modal";
 import Spinner from "../LoadingSpinner";
+import { useNavigate } from 'react-router-dom';
 
 const JDUploader = ({ open, onClose }) => {
   const modalRef = useRef(null);
   const [processing, setProcessing] = useState(false);
+  const navigate = useNavigate()
 
   useEffect(() => {
     if (!open) return;
@@ -19,15 +21,18 @@ const JDUploader = ({ open, onClose }) => {
   const uploadPDF = async (files) => {
     try {
       setProcessing(true);
-      const formData = new FormData();
-      formData.append('File', files[0]);
-      
-      const res = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/parseJD/analyze`, {
-        method: 'POST',
-        body: formData,
-      });
-      const json = await res.json();
-      if (!res.ok) throw new Error(json.error || 'Upload failed');
+      for (const file of Array.from(files)) {
+        const formData = new FormData();
+        formData.append('File', file);
+        const res = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/parseJD/analyze`, {
+          method: 'POST',
+          body: formData,
+        });
+        const json = await res.json();
+        if (!res.ok) throw new Error(json.error || `Upload failed for ${file.name}`);
+      }
+      onClose();
+      navigate('/tasks');
     } catch (err) {
       alert(err.message);
       setProcessing(false);
