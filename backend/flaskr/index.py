@@ -11,12 +11,18 @@ from .db import pdf_collection
 from bson import ObjectId
 import json
 import signal
+import os
 
 app = Flask(__name__)
-socketio = SocketIO(app, cors_allowed_origins="*", async_mode='gevent_uwsgi')
+redis_url = os.getenv("REDIS_URL", "redis://redis:6379/0")
+socketio = SocketIO(
+    app, 
+    cors_allowed_origins="*", 
+    async_mode='gevent_uwsgi',
+    message_queue=redis_url
+)
 task_service = TaskService(socketio)
 app.task_service = task_service
-task_service.start_worker()
 
 CORS(app, resources={r"/api/*": {"origins": "*"}})
 
