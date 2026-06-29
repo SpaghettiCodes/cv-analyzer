@@ -249,7 +249,6 @@ def parse_jd_confirm():
                 task.status = "completed"
                 task.finished_at = datetime.now(timezone.utc)
                 service.save(task)
-                service.broadcast_tasks()
             except Exception as e:
                 print(f"Error completing task {task_id}: {e}")
 

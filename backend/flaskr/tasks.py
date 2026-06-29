@@ -16,27 +16,12 @@ class TaskService:
         self._collection = task_collection
         self._sockets = set()
 
-    def register_socket(self, ws):
-        self._sockets.add(ws)
-        try:
-            ws.send(json.dumps({
-                "type": "snapshot",
-                "tasks": [task_to_summary(t) for t in self.list_tasks()]
-            }))
-        except Exception:
-            self._sockets.discard(ws)
-
-    def unregister_socket(self, ws):
-        self._sockets.discard(ws)
-
     def save(self, task: Task) -> None:
         task_collection.replace_one(
             {"id": task.id},
             self._to_doc(task),
             upsert=True,
         )
-
-        self.broadcast_tasks()
 
     def load(self, task_id: str) -> Task:
         if not task_id or task_id != task_id.strip():
@@ -51,23 +36,6 @@ class TaskService:
         documents = self._collection.find().sort("created_at", pymongo.DESCENDING)
         return [self._from_doc(document) for document in documents]
 
-    def broadcast_tasks(self) -> None:
-        payload = json.dumps({
-            "type": "snapshot",
-            "tasks": [task_to_summary(t) for t in self.list_tasks()]
-        })
-        for ws in list(self._sockets):
-            try:
-                ws.send(payload)
-            except Exception:
-                self._sockets.discard(ws)
-
-        try:
-            summaries = [task_to_summary(task) for task in self.list_tasks()]
-            self._socketio.emit('snapshot', summaries, room='task_updates', namespace='/ws')
-        except Exception:
-            pass
-
     def create_resume_task(self, resume_id):
         doc = pdf_collection.find_one({"_id": ObjectId(resume_id)})
         filename = doc.get("original_filename") if doc else str(resume_id)
@@ -79,7 +47,6 @@ class TaskService:
         )
         task.output_name = filename
         self.save(task)
-        self.broadcast_tasks
         run_resume_task.delay(str(task.id), str(resume_id))
         return task
 
